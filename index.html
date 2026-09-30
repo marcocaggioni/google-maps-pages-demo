@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Addresses on a Google Map — GitHub Pages demo</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1f2937; }
+  header { padding: 1.25rem 1.5rem; background: #0f4c81; color: #fff; }
+  header h1 { margin: 0 0 .25rem; font-size: 1.4rem; }
+  header p { margin: 0; opacity: .9; font-size: .95rem; }
+  header a { color: #cfe6ff; }
+  #key-warning { display: none; margin: 0; padding: .9rem 1.5rem; background: #fef3c7; color: #92400e; border-bottom: 1px solid #fcd34d; font-size: .95rem; }
+  #key-warning code { background: #fde68a; padding: .1rem .35rem; border-radius: 4px; }
+  main { display: flex; height: calc(100vh - 100px); min-height: 480px; }
+  #sidebar { width: 340px; max-width: 42vw; overflow-y: auto; border-right: 1px solid #e5e7eb; background: #f9fafb; }
+  #sidebar h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; padding: 1rem 1.25rem .25rem; margin: 0; }
+  .place { padding: .9rem 1.25rem; border-bottom: 1px solid #e5e7eb; cursor: pointer; }
+  .place:hover { background: #eef4fb; }
+  .place.active { background: #dbeafe; border-left: 4px solid #0f4c81; padding-left: calc(1.25rem - 4px); }
+  .place h3 { margin: 0 0 .25rem; font-size: 1rem; }
+  .place .addr { font-size: .85rem; color: #4b5563; margin: 0 0 .35rem; }
+  .place .desc { font-size: .85rem; color: #6b7280; margin: 0; }
+  .place .missing { font-size: .8rem; color: #b45309; margin: .35rem 0 0; }
+  #map { flex: 1; }
+  .iw h3 { margin: 0 0 .3rem; font-size: 1rem; }
+  .iw p { margin: .25rem 0; font-size: .85rem; }
+  .iw .addr { color: #4b5563; }
+  footer { padding: .75rem 1.5rem; font-size: .8rem; color: #6b7280; }
+  @media (max-width: 720px) {
+    main { flex-direction: column; height: auto; }
+    #sidebar { width: 100%; max-width: none; max-height: 38vh; border-right: 0; border-bottom: 1px solid #e5e7eb; }
+    #map { height: 62vh; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🗺️ Addresses on a Google Map</h1>
+  <p>Markers are generated automatically from <a href="addresses.json">addresses.json</a> in this repo. Edit that file, push, and the map updates.</p>
+</header>
+<p id="key-warning">⚠️ No Google Maps API key set yet. The address list below still works, but the map needs a key — put it in <code>config.js</code> following the <a href="https://github.com/marcocaggioni/google-maps-pages-demo#setup">README steps</a>.</p>
+<main>
+  <aside id="sidebar"><h2>Places</h2><div id="place-list"></div></aside>
+  <div id="map"></div>
+</main>
+<footer>Demo repo: <a href="https://github.com/marcocaggioni/google-maps-pages-demo">marcocaggioni/google-maps-pages-demo</a> · Google Maps JavaScript API + GitHub Pages</footer>
+<script src="config.js"></script>
+<script>
+(function () {
+  "use strict";
+  var listEl = document.getElementById("place-list");
+  var key = (typeof GOOGLE_MAPS_API_KEY === "string") ? GOOGLE_MAPS_API_KEY.trim() : "";
+
+  // The sidebar list renders straight from addresses.json — no API key needed.
+  fetch("addresses.json")
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var places = data.places || [];
+      if (!key || key === "YOUR_API_KEY_HERE") {
+        document.getElementById("key-warning").style.display = "block";
+        renderList(places, null);
+        return;
+      }
+      var script = document.createElement("script");
+      script.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(key) + "&callback=initMap";
+      script.async = true;
+      script.defer = true;
+      script.onerror = function () {
+        var w = document.getElementById("key-warning");
+        w.style.display = "block";
+        w.textContent = "⚠️ The Google Maps script failed to load — double-check the API key in config.js and that the Maps JavaScript API is enabled.";
+      };
+      window.__places = places;
+      document.head.appendChild(script);
+    })
+    .catch(function () { listEl.innerHTML = "<div class='place'>Could not load addresses.json.</div>"; });
+
+  function renderList(places, onSelect) {
+    listEl.innerHTML = "";
+    places.forEach(function (p, i) {
+      var div = document.createElement("div");
+      div.className = "place";
+      div.id = "place-" + i;
+      var h = document.createElement("h3"); h.textContent = p.name;
+      var a = document.createElement("p"); a.className = "addr"; a.textContent = p.address;
+      var d = document.createElement("p"); d.className = "desc"; d.textContent = p.description || "";
+      div.appendChild(h); div.appendChild(a); div.appendChild(d);
+      if (onSelect) div.addEventListener("click", function () { onSelect(i); });
+      listEl.appendChild(div);
+    });
+  }
+
+  function infoNode(p) {
+    var div = document.createElement("div");
+    div.className = "iw";
+    var h = document.createElement("h3"); h.textContent = p.name;
+    var a = document.createElement("p"); a.className = "addr"; a.textContent = p.address;
+    var d = document.createElement("p"); d.textContent = p.description || "";
+    div.appendChild(h); div.appendChild(a); div.appendChild(d);
+    return div;
+  }
+
+  // Called by the Google Maps script once it loads.
+  window.initMap = function () {
+    var places = window.__places || [];
+    var map = new google.maps.Map(document.getElementById("map"), {
+      zoom: 2, center: { lat: 20, lng: 0 }, mapTypeControl: true
+    });
+    var bounds = new google.maps.LatLngBounds();
+    var geocoder = new google.maps.Geocoder();
+    var info = new google.maps.InfoWindow();
+    var markers = new Array(places.length).fill(null);
+
+    function select(i) {
+      document.querySelectorAll(".place").forEach(function (el) { el.classList.remove("active"); });
+      var el = document.getElementById("place-" + i);
+      if (el) { el.classList.add("active"); el.scrollIntoView({ block: "nearest" }); }
+      var m = markers[i];
+      if (m) { map.panTo(m.getPosition()); info.setContent(infoNode(places[i])); info.open(map, m); }
+    }
+
+    function addMarker(i, latLng) {
+      var m = new google.maps.Marker({ position: latLng, map: map, title: places[i].name });
+      m.addListener("click", function () { select(i); });
+      markers[i] = m;
+      bounds.extend(latLng);
+      map.fitBounds(bounds);
+    }
+
+    renderList(places, select);
+
+    // Resolve every address: precomputed lat/lng wins, otherwise geocode live.
+    var jobs = places.map(function (p, i) {
+      return new Promise(function (resolve) {
+        if (typeof p.lat === "number" && typeof p.lng === "number") {
+          resolve({ i: i, latLng: new google.maps.LatLng(p.lat, p.lng) });
+        } else {
+          geocoder.geocode({ address: p.address }, function (results, status) {
+            resolve({ i: i, latLng: (status === "OK" && results[0]) ? results[0].geometry.location : null });
+          });
+        }
+      });
+    });
+
+    Promise.all(jobs).then(function (results) {
+      results.forEach(function (r) {
+        if (r.latLng) { addMarker(r.i, r.latLng); return; }
+        var el = document.getElementById("place-" + r.i);
+        if (el) {
+          var warn = document.createElement("p");
+          warn.className = "missing";
+          warn.textContent = "⚠️ Could not locate this address.";
+          el.appendChild(warn);
+        }
+      });
+    });
+  };
+})();
+</script>
+</body>
+</html>
