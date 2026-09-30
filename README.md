@@ -2,6 +2,7 @@
 
 A minimal example of a **Google Map embedded in GitHub Pages** whose markers are
 driven by a **list of addresses stored in the repo** (`addresses.json`).
+It currently shows hospitals across Greater Cincinnati.
 
 Edit `addresses.json`, push to `main`, and the map on the live site updates
 automatically — no code changes needed.
